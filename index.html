@@ -210,7 +210,19 @@
                 </div>
                 <div>
                     <label class="block text-gray-400 text-sm mb-1">Predecessors</label>
-                    <input type="text" id="modalPredecessors" class="w-full px-3 py-2 rounded text-white" placeholder="e.g., A1010, A1020">
+                    <div id="selectedPredecessors" class="flex flex-wrap gap-2 mb-2 min-h-[32px]">
+                        <!-- Selected predecessors will appear here as tags -->
+                    </div>
+                    <div class="relative">
+                        <button type="button" onclick="togglePredecessorDropdown()" class="w-full px-3 py-2 rounded text-white bg-[#1e2a3a] border border-gray-600 hover:border-blue-500 text-left flex items-center justify-between">
+                            <span class="text-gray-400">+ Add Predecessor</span>
+                            <i class="fas fa-chevron-down text-gray-400 text-xs"></i>
+                        </button>
+                        <div id="predecessorDropdown" class="hidden absolute z-20 w-full mt-1 bg-[#1e2a3a] border border-gray-600 rounded shadow-lg max-h-40 overflow-y-auto">
+                            <!-- Available tasks will be listed here -->
+                        </div>
+                    </div>
+                    <input type="hidden" id="modalPredecessors">
                 </div>
                 <div class="col-span-2">
                     <label class="block text-gray-400 text-sm mb-1">Activity Type</label>
@@ -519,6 +531,78 @@
             render();
         }
 
+        // Predecessor management
+        let selectedPredecessors = [];
+
+        function togglePredecessorDropdown() {
+            const dropdown = document.getElementById('predecessorDropdown');
+            dropdown.classList.toggle('hidden');
+            if (!dropdown.classList.contains('hidden')) {
+                populatePredecessorDropdown();
+            }
+        }
+
+        function populatePredecessorDropdown() {
+            const dropdown = document.getElementById('predecessorDropdown');
+            const currentTaskId = document.getElementById('modalTaskId').value;
+            
+            // Get available tasks (exclude current task and already selected predecessors)
+            const availableTasks = tasks.filter(t => 
+                t.id !== currentTaskId && !selectedPredecessors.includes(t.id)
+            );
+            
+            if (availableTasks.length === 0) {
+                dropdown.innerHTML = '<div class="px-3 py-2 text-gray-500 text-sm">No available tasks</div>';
+                return;
+            }
+            
+            dropdown.innerHTML = availableTasks.map(task => `
+                <div onclick="addPredecessor('${task.id}')" 
+                     class="px-3 py-2 hover:bg-blue-600 cursor-pointer flex items-center gap-2 text-sm">
+                    <span class="text-blue-400 font-mono">${task.id}</span>
+                    <span class="text-gray-300 truncate">${task.name}</span>
+                </div>
+            `).join('');
+        }
+
+        function addPredecessor(taskId) {
+            if (!selectedPredecessors.includes(taskId)) {
+                selectedPredecessors.push(taskId);
+                updatePredecessorTags();
+            }
+            document.getElementById('predecessorDropdown').classList.add('hidden');
+        }
+
+        function removePredecessor(taskId) {
+            selectedPredecessors = selectedPredecessors.filter(id => id !== taskId);
+            updatePredecessorTags();
+        }
+
+        function updatePredecessorTags() {
+            const container = document.getElementById('selectedPredecessors');
+            
+            if (selectedPredecessors.length === 0) {
+                container.innerHTML = '<span class="text-gray-500 text-sm">No predecessors selected</span>';
+                return;
+            }
+            
+            container.innerHTML = selectedPredecessors.map(predId => {
+                const task = tasks.find(t => t.id === predId);
+                const taskName = task ? task.name : predId;
+                return `
+                    <div class="flex items-center gap-1 bg-blue-600 px-2 py-1 rounded text-xs">
+                        <span class="font-mono">${predId}</span>
+                        <button type="button" onclick="removePredecessor('${predId}')" class="hover:text-red-300 ml-1">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+            
+            // Update hidden input
+            document.getElementById('modalPredecessors').value = selectedPredecessors.join(', ');
+        }
+
         function openEditModal(taskId) {
             const task = tasks.find(t => t.id === taskId);
             if (!task) return;
@@ -529,8 +613,12 @@
             document.getElementById('modalStart').value = formatDateInput(task.start);
             document.getElementById('modalFinish').value = formatDateInput(task.finish);
             document.getElementById('modalPercent').value = task.percent;
-            document.getElementById('modalPredecessors').value = task.predecessors.join(', ');
             document.getElementById('modalType').value = task.type;
+            
+            // Initialize predecessors
+            selectedPredecessors = [...task.predecessors];
+            updatePredecessorTags();
+            document.getElementById('predecessorDropdown').classList.add('hidden');
             
             document.getElementById('taskModal').classList.remove('hidden');
         }
@@ -549,10 +637,7 @@
             task.start = new Date(document.getElementById('modalStart').value + 'T00:00:00');
             task.finish = addDays(task.start, task.duration - 1);
             task.percent = parseInt(document.getElementById('modalPercent').value) || 0;
-            task.predecessors = document.getElementById('modalPredecessors').value
-                .split(',')
-                .map(p => p.trim())
-                .filter(p => p && tasks.some(t => t.id === p));
+            task.predecessors = [...selectedPredecessors];
             task.type = document.getElementById('modalType').value;
             
             if (task.type === 'milestone') {
@@ -640,6 +725,16 @@
             const duration = parseInt(document.getElementById('modalDuration').value) || 1;
             const finish = addDays(start, duration - 1);
             document.getElementById('modalFinish').value = formatDateInput(finish);
+        });
+
+        // Close predecessor dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('predecessorDropdown');
+            const dropdownButton = e.target.closest('button');
+            if (dropdown && !dropdown.contains(e.target) && 
+                (!dropdownButton || !dropdownButton.onclick?.toString().includes('togglePredecessorDropdown'))) {
+                dropdown.classList.add('hidden');
+            }
         });
 
         // Initialize
