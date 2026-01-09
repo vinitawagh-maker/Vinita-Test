@@ -108,6 +108,9 @@
                 <button onclick="zoomOut()" class="bg-gray-600 hover:bg-gray-700 px-3 py-1.5 rounded text-sm">
                     <i class="fas fa-search-minus"></i>
                 </button>
+                <button onclick="scheduleProject()" class="bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded text-sm flex items-center gap-2">
+                    <i class="fas fa-calendar-check"></i> Schedule
+                </button>
             </div>
         </div>
     </header>
@@ -710,6 +713,60 @@
         function zoomOut() {
             dayWidth = Math.max(dayWidth - 10, 15);
             render();
+        }
+
+        // Schedule project - recalculate all dates based on dependencies
+        function scheduleProject() {
+            const dataDate = document.getElementById('dataDate').value;
+            const projectStart = dataDate ? new Date(dataDate + 'T00:00:00') : new Date();
+            projectStart.setHours(0, 0, 0, 0);
+            
+            // Create a map for quick lookup
+            const taskMap = {};
+            tasks.forEach(t => taskMap[t.id] = t);
+            
+            // Track which tasks have been scheduled
+            const scheduled = new Set();
+            
+            // Schedule tasks in dependency order
+            function scheduleTask(task) {
+                if (scheduled.has(task.id)) return;
+                
+                // First schedule all predecessors
+                task.predecessors.forEach(predId => {
+                    if (taskMap[predId] && !scheduled.has(predId)) {
+                        scheduleTask(taskMap[predId]);
+                    }
+                });
+                
+                // Calculate start date based on predecessors
+                let startDate = projectStart;
+                if (task.predecessors.length > 0) {
+                    task.predecessors.forEach(predId => {
+                        const pred = taskMap[predId];
+                        if (pred && pred.finish) {
+                            const predFinishPlus1 = addDays(pred.finish, 1);
+                            if (predFinishPlus1 > startDate) {
+                                startDate = predFinishPlus1;
+                            }
+                        }
+                    });
+                }
+                
+                task.start = new Date(startDate);
+                task.finish = addDays(task.start, task.duration - 1);
+                scheduled.add(task.id);
+            }
+            
+            // Schedule all tasks
+            tasks.forEach(task => scheduleTask(task));
+            
+            calculateProjectDates();
+            calculateCriticalPath();
+            render();
+            
+            // Show confirmation
+            alert('Project scheduled successfully! All task dates have been recalculated based on dependencies.');
         }
 
         // Handle duration change recalculating finish date
