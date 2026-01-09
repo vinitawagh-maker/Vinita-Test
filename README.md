@@ -2,6 +2,9 @@
 
 A web-based project scheduling and Gantt chart application styled to resemble Oracle Primavera P6. This interactive tool allows you to manage project activities, visualize timelines, calculate critical paths, and track project progress.
 
+access the app at: https://vinitawagh-maker.github.io/Vinita-Test/
+
+
 ## Features
 
 ### 📊 Gantt Chart Visualization
